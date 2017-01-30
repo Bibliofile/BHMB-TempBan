@@ -34,7 +34,7 @@ var biblio_tempban = MessageBotExtension('biblio_tempban');
         }, '');
 
         if (bans) {
-            ui.alert('Since you have used this extension on multiple servers, not all bans could be lifted. The remaining bans are:<textarea style="width: 95%;">' + bans + '</textarea>');
+            ui.alert('Since you have used this extension on multiple servers, not all bans could be lifted. The remaining bans are:<textarea class="textarea">' + bans + '</textarea>');
         }
 
         storage.clearNamespace(ex.id);
@@ -42,7 +42,8 @@ var biblio_tempban = MessageBotExtension('biblio_tempban');
     };
 
     ex.tab = ui.addTab('Temporary Bans');
-    ex.tab.innerHTML = '<h3>Info</h3><p>All staff can use this command to temporarily ban players. If the bot is taken offline before the player is due to be unbanned, they will be unbanned when the bot is next launched. Staff cannot be banned using this command.</p><p>The following commands have been added:</p><h3>Commands</h3><ul style="margin-left: 20px;"><li>/TEMP-BAN player_name_or_ip - Bans the player for X minutes (defined below).</li><li>/TEMP-BAN-number player_name_or_ip - Bans the player to the blacklist for number minutes. If /TEMP-BAN-10 player is used, player will be banned for 10 minutes and then unbanned.</li><li>/CLEAR-TEMP-BLACKLIST - (admin only) Clears the temporary banlist and unbans everyone who is temporarily banned.</li></ul><h3>Options</h3><p>Default ban time (minutes): <input type="number" min="1" max="999" value="10"/></p>';
+    ex.tab.classList.add('container', 'is-fluid');
+    ex.tab.innerHTML = '<h3 class="title">Info</h3><p>All staff can use this command to temporarily ban players. If the bot is taken offline before the player is due to be unbanned, they will be unbanned when the bot is next launched. Staff cannot be banned using this command.</p><p>The following commands have been added:</p><h3 class="title">Commands</h3><ul style="margin-left: 20px;"><li>/TEMP-BAN player_name_or_ip - Bans the player for X minutes (defined below).</li><li>/TEMP-BAN-number player_name_or_ip - Bans the player to the blacklist for number minutes. If /TEMP-BAN-10 player is used, player will be banned for 10 minutes and then unbanned.</li><li>/CLEAR-TEMP-BLACKLIST - (admin only) Clears the temporary banlist and unbans everyone who is temporarily banned.</li></ul><h3 class="title">Options</h3><p>Default ban time (minutes): <input class="input" type="number" min="1" max="999" value="10"/></p>';
 
     var config = storage.getObject(ex.id + '_preferences', {time: 10, bans: {}});
     ex.tab.querySelector('input').value = config.time;
@@ -60,19 +61,19 @@ var biblio_tempban = MessageBotExtension('biblio_tempban');
         command = command.toLocaleLowerCase();
         args = args.toLocaleUpperCase();
 
-        if (!ex.bot.checkGroup('staff', name)) {
+        if (!ex.world.isStaff(name)) {
             return;
         }
 
         if (command == 'temp-ban') {
-            if (!ex.bot.checkGroup('staff', args)) {
+            if (!ex.world.isStaff(args)) {
                 ex.bot.send('/ban ' + args);
                 config.bans[args] = Date.now() + 60000 * config.time;
             }
             save();
         } else if (command.startsWith('temp-ban-')) {
             var minutes = Math.abs(+command.substr(9)) || config.time;
-            if (!ex.bot.checkGroup('staff', args)) {
+            if (!ex.world.isStaff(args)) {
                 ex.bot.send('/ban ' + args);
                 config.bans[args] = Date.now() + 60000 * minutes;
             }
