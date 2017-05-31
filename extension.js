@@ -3,107 +3,99 @@
     browser: true,
     devel: true,
     unused: strict,
-    undef: true
+    undef: true,
+    maxcomplexity: 10
 */
 /*global
-    MessageBotExtension
+    MessageBot
 */
 
-var biblio_tempban = MessageBotExtension('biblio_tempban');
-
-(function(ex, ui, storage, hook) {
-    ex.setAutoLaunch(true);
-    ex.uninstall = function() {
-        ui.removeTab(ex.tab);
-        hook.remove('world.command', banListener);
-
-        //Warn the user that we can't remove all players from the temp ban list.
-        var unlifted = [];
-        Object.keys(localStorage).forEach(function(key) {
-            if (key.startsWith(ex.id + '_preferences') && key != ex.id + '_preferences' + window.worldId) {
-                unlifted.push(storage.getObject(key, {}, false).bans);
-            }
-        });
-        unlifted.filter(function(item) {
-            return Object.keys(item.length);
-        });
-        var bans = unlifted.reduce(function(p, c) {
-            return p + '\n' + Object.keys(c).reduce(function(p, c) {
-                return p + '\n' + c.replace(/&/g, '&amp;').replace(/</g, '&lt;');
-            }, '');
-        }, '');
-
-        if (bans) {
-            ui.alert('Since you have used this extension on multiple servers, not all bans could be lifted. The remaining bans are:<textarea class="textarea">' + bans + '</textarea>');
-        }
-
-        storage.clearNamespace(ex.id);
-
-    };
-
-    ex.tab = ui.addTab('Temporary Bans');
-    ex.tab.classList.add('container', 'is-fluid');
-    ex.tab.innerHTML = '<h3 class="title">Info</h3><p>All staff can use this command to temporarily ban players. If the bot is taken offline before the player is due to be unbanned, they will be unbanned when the bot is next launched. Staff cannot be banned using this command.</p><p>The following commands have been added:</p><h3 class="title">Commands</h3><ul style="margin-left: 20px;"><li>/TEMP-BAN player_name_or_ip - Bans the player for X minutes (defined below).</li><li>/TEMP-BAN-number player_name_or_ip - Bans the player to the blacklist for number minutes. If /TEMP-BAN-10 player is used, player will be banned for 10 minutes and then unbanned.</li><li>/CLEAR-TEMP-BLACKLIST - (admin only) Clears the temporary banlist and unbans everyone who is temporarily banned.</li></ul><h3 class="title">Options</h3><p>Default ban time (minutes): <input class="input" type="number" min="1" max="999" value="10"/></p>';
-
-    var config = storage.getObject(ex.id + '_preferences', {time: 10, bans: {}});
-    ex.tab.querySelector('input').value = config.time;
-    ex.tab.addEventListener('change', function() {
-        config.time = +ex.tab.querySelector('input').value;
-        save();
-    });
-
-    function save() {
-        storage.set(ex.id + '_preferences', config);
+MessageBot.registerExtension('bibliofile/tempban', function(ex, world) {
+    function getConfig() {
+        return world.storage.getObject('biblio_tempban_preferences', {time: 10, bans: {}});
     }
 
-    hook.listen('world.command', banListener);
-    function banListener(name, command, args) {
-        command = command.toLocaleLowerCase();
-        args = args.toLocaleUpperCase();
+    function ban(name, time) {
+        name = name.toLocaleUpperCase();
 
-        if (!ex.world.isStaff(name)) {
+        ex.bot.send('/ban ' + name);
+
+        var config = getConfig();
+
+        if (!time) time = config.time;
+        config.bans[name] = Date.now() + 60000 * time;
+        world.storage.set('biblio_tempban_preferences', config);
+    }
+
+    function unban(name) {
+        name = name.toLocaleUpperCase();
+        ex.bot.send('/unban ' + name);
+
+        var config = getConfig();
+        delete config.bans[name];
+        world.storage.set('biblio_tempban_preferences', config);
+    }
+
+    function banListener(info) {
+        var command = info.command.toLocaleLowerCase();
+        var args = info.args.toLocaleUpperCase();
+
+        if (!info.player.isStaff()) {
             return;
         }
 
         if (command == 'temp-ban') {
-            if (!ex.world.isStaff(args)) {
-                ex.bot.send('/ban ' + args);
-                config.bans[args] = Date.now() + 60000 * config.time;
+            if (!world.getPlayer(args).isStaff()) {
+                ban(args);
             }
-            save();
         } else if (command.startsWith('temp-ban-')) {
-            var minutes = Math.abs(+command.substr(9)) || config.time;
-            if (!ex.world.isStaff(args)) {
-                ex.bot.send('/ban ' + args);
-                config.bans[args] = Date.now() + 60000 * minutes;
+            var minutes = Math.abs(+command.substr(9));
+            if (!world.getPlayer(args).isStaff()) {
+                ban(args, minutes);
             }
-            save();
         } else if (command == 'clear-temp-blacklist') {
-            Object.keys(config.bans).forEach(function(key) {
-                ex.bot.send('/unban ' + key);
-                delete config.bans[key];
-            });
-            save();
+            Object.keys(getConfig().bans).forEach(unban);
         }
     }
+    world.onCommand.sub(banListener);
 
+    var timeout;
     function unbanChecker() {
         var now = Date.now();
-        if (typeof biblio_tempban == 'object') {
-            Object.keys(config.bans).forEach(function(key) {
-                if (config.bans[key] < now) {
-                    ex.bot.send('/unban ' + key);
-                    delete config.bans[key];
-                    save();
-                }
-            });
-            setTimeout(unbanChecker, 30000);
-        }
+        var config = getConfig();
+
+        Object.keys(config.bans).forEach(function(name) {
+            if (config.bans[name] < now) {
+                unban(name);
+            }
+        });
+        timeout = setTimeout(unbanChecker, 30000);
     }
     unbanChecker();
-}(
-    biblio_tempban,
-    biblio_tempban.ui,
-    biblio_tempban.storage,
-    biblio_tempban.hook
-));
+
+    ex.uninstall = function() {
+        clearTimeout(timeout);
+        world.onCommand.unsub(banListener);
+        world.storage.clearNamespace('biblio_tempban_preferences');
+    };
+
+    // Browser only
+    if (ex.isNode || !ex.bot.getExports('ui')) return;
+
+    var ui = ex.bot.getExports('ui');
+    var tab = ui.addTab('Temporary Bans');
+    tab.innerHTML = '<div class="container is-fluid"><h3 class="title">Info</h3><p>All staff can use this command to temporarily ban players. If the bot is taken offline before the player is due to be unbanned, they will be unbanned when the bot is next launched. Staff cannot be banned using this command. Warning: If you uninstall this extension, players banned with /TEMP-BAN on another server will not be unbanned.</p><p>The following commands have been added:</p><h3 class="title">Commands</h3><ul style="margin-left: 20px;"><li>/TEMP-BAN player_name_or_ip - Bans the player for X minutes (defined below).</li><li>/TEMP-BAN-number player_name_or_ip - Bans the player to the blacklist for number minutes. If /TEMP-BAN-10 player is used, player will be banned for 10 minutes and then unbanned.</li><li>/CLEAR-TEMP-BLACKLIST - (admin only) Clears the temporary banlist and unbans everyone who is temporarily banned.</li></ul><h3 class="title">Options</h3><p>Default ban time (minutes): <input class="input" type="number" min="1" max="999" value="10"/></p></div>';
+
+    tab.addEventListener('input', function() {
+        var config = getConfig();
+        config.time = +tab.querySelector('input').value;
+        world.storage.set('biblio_tempban_preferences', config);
+    });
+
+    ex.uninstall = (function(orig) {
+        return function() {
+            orig();
+            ui.removeTab(tab);
+        };
+    }(ex.uninstall));
+});
