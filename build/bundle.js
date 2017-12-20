@@ -46,13 +46,14 @@ bot.MessageBot.registerExtension('bibliofile/tempban', (ex, world) => {
     });
     let timeout;
     function unbanChecker() {
-        var now = Date.now();
-        var config = getConfig();
-        Object.keys(config.bans).forEach(name => {
-            if (config.bans[name] < now) {
-                ex.bot.send('/unban {{NAME}}', { name });
-                delete config.bans[name];
-            }
+        const now = Date.now();
+        ex.storage.with('config', defaultConfig, config => {
+            Object.keys(config.bans).forEach(name => {
+                if (config.bans[name] < now) {
+                    ex.bot.send('/unban {{NAME}}', { name });
+                    delete config.bans[name];
+                }
+            });
         });
         timeout = setTimeout(unbanChecker, 30000);
     }

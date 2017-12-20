@@ -39,7 +39,7 @@ MessageBot.registerExtension('bibliofile/tempban', (ex, world) => {
 
     ban(target.name, time)
   }
-  world.onMessage.sub(banListener);
+  world.onMessage.sub(banListener)
 
   world.addCommand('clear-temp-blacklist', player => {
     if (!player.isAdmin) return
@@ -53,18 +53,19 @@ MessageBot.registerExtension('bibliofile/tempban', (ex, world) => {
 
   let timeout: number
   function unbanChecker() {
-    var now = Date.now();
-    var config = getConfig();
+    const now = Date.now()
+    ex.storage.with('config', defaultConfig, config => {
+      Object.keys(config.bans).forEach(name => {
+        if (config.bans[name] < now) {
+          ex.bot.send('/unban {{NAME}}', { name })
+          delete config.bans[name]
+        }
+      })
+    })
 
-    Object.keys(config.bans).forEach(name => {
-      if (config.bans[name] < now) {
-        ex.bot.send('/unban {{NAME}}', { name })
-        delete config.bans[name]
-      }
-    });
-    timeout = setTimeout(unbanChecker, 30000);
+    timeout = setTimeout(unbanChecker, 30000)
   }
-  unbanChecker();
+  unbanChecker()
 
   ex.remove = () => {
     clearTimeout(timeout)
@@ -76,7 +77,7 @@ MessageBot.registerExtension('bibliofile/tempban', (ex, world) => {
   const ui = ex.bot.getExports('ui') as UIExtensionExports | undefined
   if (!ui) return
 
-  const tab = ui.addTab('Temporary Bans');
+  const tab = ui.addTab('Temporary Bans')
   tab.innerHTML = html
 
   tab.addEventListener('input', function () {
@@ -89,4 +90,4 @@ MessageBot.registerExtension('bibliofile/tempban', (ex, world) => {
     orig()
     ui.removeTab(tab)
   })(ex.remove)
-});
+})
