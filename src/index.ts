@@ -22,16 +22,21 @@ MessageBot.registerExtension('bibliofile/tempban', (ex, world) => {
     })
   }
 
-  function banListener({ player, message}: { player: Player, message: string}) {
+  function banListener({ player, message }: { player: Player, message: string}) {
     if (!player.isStaff) return
     message = message.toLocaleLowerCase()
     if (!message.startsWith('/temp-ban')) return
+    message = message.substr('/temp-ban'.length)
 
     let { time } = getConfig()
-    const match = message.match(/^\/temp-ban-(\d+) (.*)$/)
-    if (match) {
+    if (/^-\d+ /.test(message)) { // Custom time `/temp-ban-1 bib`
+      const match = message.match(/^-(\d+) (.*)$/)!
       time = +match[1]
       message = match[2]
+    } else if (message.startsWith(' ')) { // Default time `/temp-ban bib`
+      message = message.substr(1)
+    } else { // Invalid
+      return
     }
 
     const target = world.getPlayer(message)

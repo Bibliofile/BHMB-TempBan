@@ -4,7 +4,7 @@
 	(factory(global['@bhmb/bot']));
 }(this, (function (bot) { 'use strict';
 
-var html = "<div class=\"container is-fluid\">\r\n  <h3 class=\"title\">Info</h3>\r\n  <p>All staff can use this command to temporarily ban players. If the bot is taken offline before the player is due to be unbanned,\r\n    they will be unbanned when the bot is next launched. Staff cannot be banned using this command. Warning: If you uninstall\r\n    this extension, players banned with /TEMP-BAN on another server will not be unbanned.</p>\r\n  <p>The following commands have been added:</p>\r\n  <h3 class=\"title\">Commands</h3>\r\n  <ul style=\"margin-left: 20px;\">\r\n    <li>/TEMP-BAN player_name_or_ip - Bans the player for X minutes (defined below).</li>\r\n    <li>/TEMP-BAN-number player_name_or_ip - Bans the player to the blacklist for number minutes. If /TEMP-BAN-10 player is used,\r\n      player will be banned for 10 minutes and then unbanned.</li>\r\n    <li>/CLEAR-TEMP-BLACKLIST - (admin only) Clears the temporary banlist and unbans everyone who is temporarily banned.</li>\r\n  </ul>\r\n  <h3 class=\"title\">Options</h3>\r\n  <p>Default ban time (minutes):\r\n    <input class=\"input\" type=\"number\" min=\"1\" max=\"999\" value=\"10\" />\r\n  </p>\r\n</div>\r\n";
+var html = "<div class=\"container is-fluid\">\n  <h3 class=\"title\">Info</h3>\n  <p>All staff can use this command to temporarily ban players. If the bot is taken offline before the player is due to be unbanned,\n    they will be unbanned when the bot is next launched. Staff cannot be banned using this command. Warning: If you uninstall\n    this extension, players banned with /TEMP-BAN on another server will not be unbanned.</p>\n  <p>The following commands have been added:</p>\n  <h3 class=\"title\">Commands</h3>\n  <ul style=\"margin-left: 20px;\">\n    <li>/TEMP-BAN player_name_or_ip - Bans the player for X minutes (defined below).</li>\n    <li>/TEMP-BAN-number player_name_or_ip - Bans the player to the blacklist for number minutes. If /TEMP-BAN-10 player is used,\n      player will be banned for 10 minutes and then unbanned.</li>\n    <li>/CLEAR-TEMP-BLACKLIST - (admin only) Clears the temporary banlist and unbans everyone who is temporarily banned.</li>\n  </ul>\n  <h3 class=\"title\">Options</h3>\n  <p>Default ban time (minutes):\n    <input class=\"input\" type=\"number\" min=\"1\" max=\"999\" value=\"10\" />\n  </p>\n</div>\n";
 
 bot.MessageBot.registerExtension('bibliofile/tempban', (ex, world) => {
     const defaultConfig = { time: 10, bans: {} };
@@ -22,11 +22,18 @@ bot.MessageBot.registerExtension('bibliofile/tempban', (ex, world) => {
         message = message.toLocaleLowerCase();
         if (!message.startsWith('/temp-ban'))
             return;
+        message = message.substr('/temp-ban'.length);
         let { time } = getConfig();
-        const match = message.match(/^\/temp-ban-(\d+) (.*)$/);
-        if (match) {
+        if (/^-\d+ /.test(message)) {
+            const match = message.match(/^-(\d+) (.*)$/);
             time = +match[1];
             message = match[2];
+        }
+        else if (message.startsWith(' ')) {
+            message = message.substr(1);
+        }
+        else {
+            return;
         }
         const target = world.getPlayer(message);
         if (target.isStaff)
